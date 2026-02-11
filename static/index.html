@@ -14,7 +14,7 @@
 }
 
 body {
-    background: #1c1c1c;
+    background: #121212;
     color: white;
     display: flex;
     justify-content: center;
@@ -25,35 +25,42 @@ body {
 /* Card Container */
 .card {
     width: 95%;
-    max-width: 420px;
-    background: #242424;
+    max-width: 450px;
+    background: #1e1e1e;
     padding: 25px;
-    border-radius: 12px;
-    box-shadow: 0 0 25px rgba(0,0,0,0.6);
+    border-radius: 16px;
+    box-shadow: 0 0 30px rgba(0,0,0,0.7);
     text-align: center;
 }
 
 /* Inputs */
 input {
     width: 100%;
-    padding: 12px;
-    margin: 10px 0;
-    border-radius: 8px;
+    padding: 14px;
+    margin: 12px 0;
+    border-radius: 10px;
     border: none;
-    background: #333;
+    background: #2c2c2c;
     color: white;
+    font-size: 16px;
+}
+
+input:focus {
+    outline: none;
+    border: 1px solid #4CAF50;
 }
 
 /* Buttons */
 button {
     width: 100%;
-    padding: 12px;
+    padding: 14px;
     margin-top: 10px;
-    border-radius: 8px;
+    border-radius: 10px;
     border: none;
     background: #4CAF50;
     color: white;
     font-weight: bold;
+    font-size: 16px;
     cursor: pointer;
 }
 
@@ -65,46 +72,77 @@ button:hover {
 .chat-container {
     display: none;
     flex-direction: column;
-    height: 80vh;
+    height: 85vh;
 }
 
+/* Messages */
 .messages {
     flex: 1;
     overflow-y: auto;
-    text-align: left;
-    margin-bottom: 10px;
+    margin-bottom: 15px;
+    padding-right: 5px;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Scrollbar */
+.messages::-webkit-scrollbar {
+    width: 5px;
+}
+.messages::-webkit-scrollbar-thumb {
+    background: #4CAF50;
+    border-radius: 5px;
 }
 
 .message {
-    padding: 10px;
+    padding: 12px 14px;
     margin: 8px 0;
-    border-radius: 8px;
-    max-width: 80%;
+    border-radius: 12px;
+    max-width: 75%;
+    font-size: 15px;
+    line-height: 1.4;
+    word-wrap: break-word;
 }
 
+/* User bubble */
 .user {
-    background: #3a3a3a;
+    background: #333;
     align-self: flex-end;
 }
 
+/* AI bubble */
 .ai {
     background: #4CAF50;
     color: white;
     align-self: flex-start;
 }
 
+/* Input Row */
 .row {
     display: flex;
     gap: 10px;
 }
 
-.row input {
+/* Message Input Fix */
+#msg {
     flex: 1;
+    padding: 16px;
+    font-size: 16px;
+    background: #2c2c2c;
 }
 
+/* Logout */
 .logout {
     background: crimson;
-    margin-top: 5px;
+    margin-top: 8px;
+}
+
+/* Mobile Fix */
+@media (max-width: 480px) {
+    .card {
+        height: 95vh;
+        padding: 20px;
+    }
 }
 </style>
 </head>
@@ -128,7 +166,7 @@ button:hover {
 
 <div class="card chat-container" id="chatCard">
 
-    <h2>Kaushik AI</h2>
+    <h2 style="margin-bottom:10px;">Kaushik AI</h2>
 
     <div class="messages" id="messages"></div>
 
@@ -217,6 +255,13 @@ async function send() {
     const data = await res.json();
     add(data.reply, "ai");
 }
+
+/* Enter key support */
+document.getElementById("msg").addEventListener("keypress", function(e) {
+    if (e.key === "Enter") {
+        send();
+    }
+});
 
 </script>
 
