@@ -183,11 +183,11 @@ button:hover {
     <input type="text" id="username" placeholder="Username" />
     <input type="password" id="password" placeholder="Password" />
 
-    <button onclick="login()">Login</button>
+    <button id="authBtn" onclick="submitAuth()">Login</button>
 
     <p style="margin-top:10px; color:#aaa;">
         New user?
-        <span style="color:#4CAF50;cursor:pointer;" onclick="toggleAuth()">Register</span>
+        <span id="authToggle" style="color:#4CAF50;cursor:pointer;" onclick="toggleAuth()">Register</span>
     </p>
 
 </div>
@@ -213,57 +213,76 @@ button:hover {
 
 <script>
 let isRegister = false;
-let currentUser = null;
+let token = localStorage.getItem("gc_token");
+let currentUser = localStorage.getItem("gc_user");
 
 function toggleAuth() {
     isRegister = !isRegister;
-    document.getElementById("authTitle").innerText =
-        isRegister ? "Register" : "Login";
+    authTitle.innerText = isRegister ? "Register" : "Login";
+    authBtn.innerText = isRegister ? "Register" : "Login";
+    authToggle.innerText = isRegister ? "Login" : "Register";
 }
 
-function register() {
+async function submitAuth() {
     const user = username.value.trim();
-    const pass = password.value.trim();
-
+    const pass = password.value;
     if (!user || !pass) return alert("Fill all fields");
 
-    localStorage.setItem(user, pass);
-    alert("Registered! Now login.");
-    toggleAuth();
-}
+    try {
+        const res = await fetch(isRegister ? "/register" : "/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username: user, password: pass })
+        });
+        if (!res.ok) return alert((await res.text()).trim());
 
-function login() {
-    const user = username.value.trim();
-    const pass = password.value.trim();
-
-    if (isRegister) return register();
-
-    if (localStorage.getItem(user) === pass) {
-        currentUser = user;
-
-        document.getElementById("userDisplay").innerText =
-            "Logged in as: " + currentUser;
-
-        authCard.style.display = "none";
-        chatCard.style.display = "flex";
-    } else {
-        alert("Invalid credentials");
+        if (isRegister) {
+            alert("Registered! Now login.");
+            return toggleAuth();
+        }
+        const data = await res.json();
+        token = data.token;
+        currentUser = data.username;
+        localStorage.setItem("gc_token", token);
+        localStorage.setItem("gc_user", currentUser);
+        showChat();
+    } catch (e) {
+        alert("Server not reachable. Wait a minute and try again.");
     }
 }
 
-function logout() {
-    currentUser = null;
+function showChat() {
+    userDisplay.innerText = "Logged in as: " + currentUser;
+    authCard.style.display = "none";
+    chatCard.style.display = "flex";
+}
+
+function showAuth() {
     chatCard.style.display = "none";
     authCard.style.display = "block";
     messages.innerHTML = "";
+    password.value = "";
+}
+
+async function logout() {
+    try {
+        await fetch("/logout", { method: "POST", headers: { Authorization: "Bearer " + token } });
+    } catch (e) {}
+    token = null;
+    currentUser = null;
+    localStorage.removeItem("gc_token");
+    localStorage.removeItem("gc_user");
+    showAuth();
 }
 
 function add(text, type) {
     const div = document.createElement("div");
     div.className = "message " + type;
+    div.style.whiteSpace = "pre-wrap";
     div.innerText = text;
     messages.appendChild(div);
     messages.scrollTop = messages.scrollHeight;
+    return div;
 }
 
 async function send() {
@@ -272,23 +291,62 @@ async function send() {
 
     add(message, "user");
     msg.value = "";
+    const bubble = add("...", "ai");
+    let started = false;
 
-    const res = await fetch("/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            user_id: currentUser,
-            message: message
-        })
-    });
+    try {
+        const res = await fetch("/chat/stream", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+            body: JSON.stringify({ message: message })
+        });
+        if (res.status === 401) {
+            alert("Session expired. Please login again.");
+            return logout();
+        }
+        if (!res.ok) {
+            bubble.innerText = "Error: " + (await res.text()).trim();
+            return;
+        }
 
-    const data = await res.json();
-    add(data.reply, "ai");
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = "";
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buf += decoder.decode(value, { stream: true });
+
+            let i;
+            while ((i = buf.indexOf("\n\n")) >= 0) {
+                const block = buf.slice(0, i);
+                buf = buf.slice(i + 2);
+                let event = "message", data = "";
+                for (const line of block.split("\n")) {
+                    if (line.startsWith("event: ")) event = line.slice(7);
+                    else if (line.startsWith("data: ")) data += line.slice(6);
+                }
+                if (!data) continue;
+                const payload = JSON.parse(data);
+                if (event === "error") {
+                    bubble.innerText += "\n[Error: " + payload.error + "]";
+                } else if (payload.token) {
+                    if (!started) { bubble.innerText = ""; started = true; }
+                    bubble.innerText += payload.token;
+                    messages.scrollTop = messages.scrollHeight;
+                }
+            }
+        }
+    } catch (e) {
+        bubble.innerText = "Connection error. Please try again.";
+    }
 }
 
-document.getElementById("msg").addEventListener("keypress", function(e) {
+document.getElementById("msg").addEventListener("keypress", function (e) {
     if (e.key === "Enter") send();
 });
+
+if (token && currentUser) showChat();
 </script>
 
 </body>
