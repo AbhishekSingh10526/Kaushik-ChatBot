@@ -75,13 +75,20 @@ func main() {
 		resp, err := client.CreateChatCompletion(
 			ctx,
 			openai.ChatCompletionRequest{
-				Model:    "llama-3.1-8b-instant",
+				Model:    "openai/gpt-oss-20b",
 				Messages: messages,
 			},
 		)
 
 		if err != nil {
+			log.Println("Groq error:", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if len(resp.Choices) == 0 {
+			log.Println("Groq returned no choices")
+			http.Error(w, "Empty response from model", http.StatusInternalServerError)
 			return
 		}
 
